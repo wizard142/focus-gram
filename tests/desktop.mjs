@@ -31,6 +31,9 @@ try {
   await page.waitForFunction(() =>
     document.querySelector('.timeline-title')?.textContent.includes('1 clip')
   );
+  await page.getByRole('button', { name: 'Play preview', exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('video')?.currentTime > 0.2);
+  await page.getByRole('button', { name: 'Pause preview', exact: true }).click();
   await page.getByLabel('Trim start', { exact: true }).fill('1');
   await page.getByLabel('Trim end', { exact: true }).fill('2');
   await page.getByLabel('Export quality', { exact: true }).selectOption('720');
