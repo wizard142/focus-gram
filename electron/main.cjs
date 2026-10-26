@@ -58,14 +58,18 @@ function setBounds() {
   });
 }
 async function apply() {
-  if (!guest || guest.webContents.isDestroyed()) return;
+  const view = guest;
+  if (!view || view.webContents.isDestroyed()) return;
   try {
-    if (guestCSS) await guest.webContents.removeInsertedCSS(guestCSS);
-    guestCSS = await guest.webContents.insertCSS(focusCSS);
-    await guest.webContents.executeJavaScript(installFocus(focus));
-    await guest.webContents.executeJavaScript(themeScript(theme));
-    guest.setVisible(visible);
-  } catch {}
+    if (guestCSS) await view.webContents.removeInsertedCSS(guestCSS);
+    guestCSS = await view.webContents.insertCSS(focusCSS);
+    await view.webContents.executeJavaScript(installFocus(focus));
+    await view.webContents.executeJavaScript(themeScript(theme));
+  } catch {
+    // Navigation can replace the document while its settings are being applied.
+  } finally {
+    if (guest === view && !view.webContents.isDestroyed()) view.setVisible(visible);
+  }
 }
 function ensureGuest() {
   if (guest) return;
@@ -95,7 +99,11 @@ function ensureGuest() {
   wc.on('will-redirect', (event, url) => {
     if (!isInstagram(url)) event.preventDefault();
   });
-  wc.on('did-start-loading', () => guest?.setVisible(false));
+  // Loading also fires for in-page updates, which may never emit dom-ready.
+  // Only explicit app dialogs should hide an existing Instagram view.
+  wc.on('did-stop-loading', () => {
+    if (guest?.webContents === wc && !wc.isDestroyed()) guest.setVisible(visible);
+  });
   wc.on('dom-ready', apply);
   wc.on('did-navigate-in-page', () => {
     if (blockedRoute(wc.getURL(), focus)) wc.loadURL('https://www.instagram.com/');
@@ -182,9 +190,14 @@ app.whenReady().then(() => {
   });
   handle('instagram:refresh', async () => {
     ensureGuest();
-    if (guest.webContents.isCrashed()) {
-      await guest.webContents.loadURL('https://www.instagram.com/');
-    } else guest.webContents.reload();
+    const wc = guest.webContents;
+    try {
+      await wc.loadURL(
+        wc.isCrashed() ? 'https://www.instagram.com/' : wc.getURL() || 'https://www.instagram.com/'
+      );
+    } finally {
+      await apply();
+    }
   });
   handle('instagram:reset', async () => {
     if (stories.publishing) throw Error('Wait for the Story upload to finish.');

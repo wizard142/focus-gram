@@ -1,23 +1,13 @@
-# Focus Gram v0.2.0
+# Focus Gram v0.2.1
 
-A smaller interface, real composer handoff, and experimental personal-account Story uploads.
+Fixes the grey Instagram view after publishing a Story.
 
-## Changes
+The app previously hid Instagram on every loading event and only restored it when a new document was ready. Instagram's in-page loading can finish without that event, leaving the view hidden until focus mode was toggled.
 
-- Removed the built-in video editor, sample project, export flow, promotional headings and dashboard cards.
-- Instagram now occupies the window below one compact toolbar.
-- Added persistent light/dark themes and bundled Instrument Sans typography.
-- Create → Post/Reel now opens Instagram's actual composer and selects your finished file. Captions are copied for pasting. You review and share in Instagram; no project downloads are involved.
-- Added opt-in experimental photo/video Story publishing using the existing app session and a local instagrapi helper. No phone or Android container is required.
+The view now stays visible during in-page loading, restores the requested visibility when loading stops, and recovers correctly when a settings update is interrupted by navigation. Refresh waits for the page load and reapplies settings. A refresh failure does not turn a confirmed Story publication into an upload error.
 
-## Stories
+A native regression test reproduces the old failure and verifies the complete Story-success/refresh path with a mocked publication. Tests do not publish to a real account.
 
-Requires Python 3.11+, FFmpeg and one-time setup in Create → Story. Uses unofficial Instagram APIs; it may fail or trigger verification. Explicit acknowledgement is required before each immediate publication. Mobile music, stickers, effects and full mobile feature parity are not included.
+Story uploads have been reported working on the user's personal account. They remain experimental. Instagram's mobile effects, music catalog and interactive stickers are not implemented; this patch does not add them.
 
-No live-account Story was published in testing. Local preparation, dependency setup, session/error handling and mocked publication responses are tested. Normal composer handoff and focus filtering are tested with an isolated native fixture, not your account.
-
-## Linux
-
-AppImage and tarball are attached, with SHA256 checksums. System FFmpeg and Python are not bundled. Keep Electron's sandbox enabled. If FUSE is unavailable, use `--appimage-extract-and-run`.
-
-Your existing Instagram session uses the same application data and partition as v0.1. Editor settings are no longer used. Builds are unsigned and have no automatic update service.
+Linux AppImage and tarball are attached. The existing login, theme and focus preference remain in the same application data directory. Keep Electron's sandbox enabled.

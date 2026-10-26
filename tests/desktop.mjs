@@ -37,6 +37,17 @@ try {
     if (!remote) throw Error('Instagram guest was not created');
     await remote.loadURL('https://www.instagram.com/');
   });
+  const visibilityAfterInPageLoad = await app.evaluate(({ BrowserWindow, webContents }) => {
+    const remote = webContents
+      .getAllWebContents()
+      .find((w) => w.getURL().includes('instagram.com'));
+    const view = BrowserWindow.getAllWindows()[0].contentView.children.find(
+      (v) => v.webContents === remote
+    );
+    remote.emit('did-start-loading');
+    return view.getVisible();
+  });
+  assert.equal(visibilityAfterInPageLoad, true, 'In-page loading must not hide the Instagram view');
   await page.getByRole('button', { name: 'Dark theme', exact: true }).click();
   assert.equal(await app.evaluate(({ nativeTheme }) => nativeTheme.themeSource), 'dark');
   await page.getByRole('button', { name: 'Light theme', exact: true }).click();
@@ -92,10 +103,48 @@ try {
     await page.evaluate(() => window.focusGram.prepareStories());
     assert.equal((await page.evaluate(() => window.focusGram.storyCapabilities())).ready, true);
   }
+  // Exercise the full post-Story UI path, with publication mocked locally.
+  await app.evaluate(({ ipcMain }) => {
+    ipcMain.removeHandler('story:publish');
+    ipcMain.handle('story:publish', async () => ({ published: true, id: 'fixture-story' }));
+    ipcMain.removeHandler('story:prepare');
+    ipcMain.handle('story:prepare', async () => ({ ready: true }));
+  });
+  await page.getByRole('button', { name: 'Create', exact: true }).click();
+  await page.getByRole('tab', { name: /Story/ }).click();
+  const enable = page.getByRole('button', { name: 'Enable experimental Stories', exact: true });
+  if (await enable.count()) await enable.click();
+  await page.getByRole('button', { name: /Choose a photo or video/ }).click();
+  const setup = page.getByRole('button', { name: 'Set up', exact: true });
+  if (await setup.count()) await setup.click();
+  await page.getByRole('checkbox').check();
+  await page.getByRole('button', { name: 'Publish Story', exact: true }).click();
+  await page.waitForFunction(() => !document.querySelector('[role=dialog]'));
+  let restored = false;
+  for (let attempt = 0; attempt < 40; attempt++) {
+    restored = await app.evaluate(({ BrowserWindow, webContents }) => {
+      const remote = webContents
+        .getAllWebContents()
+        .find((w) => w.getURL().includes('instagram.com'));
+      const view = BrowserWindow.getAllWindows()[0].contentView.children.find(
+        (v) => v.webContents === remote
+      );
+      return view?.getVisible() && !remote.isLoadingMainFrame();
+    });
+    if (restored) break;
+    await page.waitForTimeout(100);
+  }
+  assert.equal(restored, true, 'Story completion must restore Instagram without toggling focus');
+  assert.equal(
+    await page
+      .getByRole('switch', { name: 'Focus mode', exact: true })
+      .getAttribute('aria-checked'),
+    'true'
+  );
   await fs.mkdir(path.join(root, 'test-results'), { recursive: true });
   await page.screenshot({ path: path.join(root, 'test-results/desktop.png') });
   console.log(
-    'Desktop passed: native themes, file selection, authenticated composer transfer, caption handoff, focus filtering and guest sandbox. No real posts were made.'
+    'Desktop passed: native themes, file selection, authenticated composer transfer, caption handoff, focus filtering, guest sandbox, and post-Story refresh. No real posts were made.'
   );
 } catch (error) {
   if (app) {

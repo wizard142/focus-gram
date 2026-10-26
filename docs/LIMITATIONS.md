@@ -1,6 +1,6 @@
 # Limits in v0.2
 
-- **Personal Story uploads are unofficial and experimental.** Instagram can refuse them, invalidate a web session for mobile API use, or require verification. Photo/video preparation, session bootstrap, safe failure handling and publication-response handling are tested offline. Live Story publication is unverified.
+- **Personal Story uploads are unofficial and experimental.** Instagram can refuse them, invalidate a web session for mobile API use, or require verification. Photo/video preparation, session bootstrap, safe failure handling and publication-response handling are tested offline. Story publication has been reported working on one personal account; other accounts are unverified.
 - **No mobile feature parity.** Instagram music, interactive stickers, AR filters, calls, mobile editing tools, Close Friends targeting, and Story reshares are not implemented. Prepare files in a separate editor.
 - **Video Stories:** MP4 only, up to 60 seconds, under 500 MB. The app prepares 1080×1920 H.264/AAC video with letterboxing and silent audio when needed. FFmpeg and Python 3.11+ are required. No video splitting or background queue.
 - **Photo Stories:** JPG, PNG or WEBP; the library prepares a portrait image without cropping its contents.

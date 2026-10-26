@@ -192,7 +192,9 @@ function App() {
         setNotice('Story published.');
         setDialog(null);
         setFile(null);
-        desktop.refresh();
+        desktop
+          .refresh()
+          .catch(() => setNotice('Story published. Use Reload if Instagram does not update.'));
       } else {
         setStage('Opening Instagram’s uploader…');
         const result = await desktop.openComposer({ id: file.id, caption, kind });
@@ -411,7 +413,7 @@ function App() {
                   </p>
                 )}
                 <div className="settings-footer">
-                  <span>Focus Gram {desktop ? '0.2.0' : '· browser preview'}</span>
+                  <span>Focus Gram {desktop ? '0.2.1' : '· browser preview'}</span>
                   {desktop && (
                     <button
                       className="text-button"

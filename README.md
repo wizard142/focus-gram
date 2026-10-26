@@ -15,13 +15,13 @@ Instagram takes up the window. A small toolbar adds focus mode, light/dark theme
 
 ## Important limits
 
-Story uploads use [instagrapi](https://github.com/subzeroid/instagrapi), not a supported Meta API. They may fail or trigger account verification. The helper has been checked locally with real dependencies and mocked upload responses; **no live-account Story has been published during testing**. Mobile-only music, stickers, effects and calls are not included. This is not full mobile-app parity.
+Story uploads use [instagrapi](https://github.com/subzeroid/instagrapi), not a supported Meta API. They may fail or trigger account verification. Story uploading has been reported working on one personal account. Automated tests use real local dependencies and mocked upload responses; they do not publish to a real account. Mobile-only music, stickers, effects and calls are not included. This is not full mobile-app parity.
 
 Instagram can change its markup, block embedded login, or reject a session imported from the web client. Composer transfer and focus filtering have browser and native fixture tests, not a guarantee for every account or Instagram release. Finish normal post/Reel publication in Instagram; only the experimental Story button publishes immediately.
 
 ## Install on CachyOS / Arch
 
-[Download the Linux alpha](https://github.com/wizard142/focus-gram/releases/tag/v0.2.0), or run from source:
+[Download the Linux alpha](https://github.com/wizard142/focus-gram/releases/tag/v0.2.1), or run from source:
 
 ```bash
 sudo pacman -S --needed nodejs npm ffmpeg git python
