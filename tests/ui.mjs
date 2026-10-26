@@ -102,7 +102,7 @@ try {
   await fixture.route('https://www.instagram.com/**', (route) =>
     route.fulfill({
       contentType: 'text/html',
-      body: '<main><div id="stories"><a href="/stories/friend/1/">Story</a></div><article id="post">A feed post</article><a id="reel" href="/reels/">Reels</a><a id="dm" href="/direct/inbox/">Messages</a></main>',
+      body: '<main><div id="stories"><a href="/stories/friend/1/">Story</a></div><article id="post">A feed post<form><input placeholder="Add a comment"/></form></article><a id="reel" href="/reels/">Reels</a><a id="dm" href="/direct/inbox/">Messages</a></main>',
     })
   );
   await fixture.goto('https://www.instagram.com/');
@@ -129,7 +129,7 @@ try {
     .then(async () =>
       fixture.evaluate(() => {
         document.querySelector('main').innerHTML =
-          '<article id="login"><form><input placeholder="Username"/></form></article>';
+          '<article id="login"><form><input name="username" placeholder="Username"/><input type="password"/></form></article>';
       })
     );
   await fixture.addStyleTag({ content: focusCSS });

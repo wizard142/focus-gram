@@ -37,6 +37,10 @@ It combines a local video editor with an isolated Instagram web workspace. It do
 
 **The editor and FFmpeg pipeline are tested. Instagram filtering has automated DOM fixture tests, but authenticated Stories, messaging, and uploading have not been verified with a real account.** Instagram changes its layout and may reject embedded browsers. This is an early alpha, not a promise of complete Instagram compatibility. See [limitations](docs/LIMITATIONS.md).
 
+## Download
+
+[Linux alpha downloads](https://github.com/wizard142/focus-gram/releases/tag/v0.1.0) include an AppImage and portable tarball. Install system FFmpeg before using the editor. Source setup is below.
+
 ## Run on CachyOS / Arch Linux
 
 Requires Node.js **22.12+**, npm, `ffmpeg`, and `ffprobe` (both provided by the FFmpeg package). Current Node LTS is recommended.

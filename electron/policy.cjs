@@ -15,7 +15,7 @@ function blockedRoute(url, focus = true) {
   return BLOCKED.test(new URL(url).pathname);
 }
 const focusCSS = `
-html[data-focus-gram="on"][data-focus-gram-page="home"] body main article:not(:has(form)),
+html[data-focus-gram="on"][data-focus-gram-page="home"] body main article:not(:has(input[type="password"], input[name="username"])),
 html[data-focus-gram="on"][data-focus-gram-page="home"] body main [role="feed"],
 html[data-focus-gram="on"] a[href^="/reel/"],
 html[data-focus-gram="on"] a[href^="/reels/"],
