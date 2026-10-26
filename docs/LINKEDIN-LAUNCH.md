@@ -1,26 +1,21 @@
-# LinkedIn launch draft
+# LinkedIn draft — v0.2
 
-I wanted to post a reel and check my friends’ Stories. Somehow that always turned into scrolling.
+I’m building Focus Gram, a small Instagram client for Linux.
 
-So I started building Focus Gram: an open-source Linux app for creating more and scrolling less.
+The first version tried to do too much. I removed the video editor and dashboard, and rebuilt it around what I actually wanted: Instagram with fewer distractions.
 
-The first alpha includes:
-• Local reel editing: trim and arrange clips, portrait framing, text, and your own audio.
-• 720p / 1080p MP4 export, powered by FFmpeg.
-• A focused Instagram workspace designed to block feed posts and Reels while keeping Stories and messages accessible.
+The new version has:
+• Focus mode that hides posts and Reels while keeping Stories and messages.
+• A compact interface with light and dark themes.
+• A way to send finished files from my normal editing app into Instagram’s uploader.
+• Experimental personal-account Story uploads, without an Android container.
 
-Built with React, Electron, and FFmpeg. No Android container required.
+Stories use an unofficial integration and are still unverified with a live account. This is an alpha, not a replacement for every mobile feature.
 
-It’s an early alpha: the local editor and export pipeline are tested; authenticated Instagram flows and filtering still need real-world testing. Publishing currently uses Instagram’s own web upload flow. This isn’t a replacement for every mobile-app feature.
+Source and Linux downloads: https://github.com/wizard142/focus-gram
 
-I’d love feedback from Linux users and people who use Instagram to create, rather than endlessly consume.
-
-Code and setup: https://github.com/wizard142/focus-gram
-
-#OpenSource #Linux #BuildInPublic #React #Electron #DigitalWellbeing
+#Linux #OpenSource #BuildInPublic #Electron
 
 ---
 
-Suggested attachments: `screenshots/editor.png` and `screenshots/studio.png`.
-
-Before sharing, run it yourself, try an export, and describe your experience in your own words. The screenshots show the generated sample landscape, not a real Instagram account. This is a draft only; nothing has been posted to LinkedIn.
+Attach screenshots/create.png or screenshots/light.png. Edit the wording to reflect your own experience before posting. Nothing has been posted automatically.

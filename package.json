@@ -1,7 +1,7 @@
 {
   "name": "focus-gram",
-  "version": "0.1.0",
-  "description": "Create more. Scroll less. A Linux-first reel studio with a focused Instagram workspace.",
+  "version": "0.2.0",
+  "description": "A focused Instagram desktop client for Linux.",
   "author": "wizard142",
   "license": "MIT",
   "type": "module",
@@ -14,9 +14,11 @@
     "test:ui": "node tests/ui.mjs",
     "pack": "npm run build && electron-builder --linux dir",
     "dist": "npm run build && electron-builder --linux AppImage tar.gz",
-    "test:desktop": "npm run build && node tests/desktop.mjs"
+    "test:desktop": "npm run build && node tests/desktop.mjs",
+    "test:stories": "python3 -m unittest discover -s tests -p \"*_test.py\""
   },
   "dependencies": {
+    "@fontsource-variable/instrument-sans": "^5.3.0",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
@@ -36,13 +38,15 @@
       "dist/**/*",
       "electron/**/*",
       "package.json",
-      "LICENSE"
+      "LICENSE",
+      "!**/__pycache__/**",
+      "!**/*.pyc"
     ],
     "directories": {
       "output": "release"
     },
     "linux": {
-      "category": "AudioVideo",
+      "category": "Network",
       "target": [
         "AppImage",
         "tar.gz"
@@ -50,10 +54,14 @@
       "icon": "public/icon.png",
       "desktop": {
         "entry": {
-          "Keywords": "Instagram;Video;Reels;Focus;Editor;"
+          "Keywords": "Instagram;Stories;Focus;"
         }
       }
-    }
+    },
+    "asarUnpack": [
+      "electron/story_worker.py",
+      "electron/requirements-stories.txt"
+    ]
   },
   "repository": {
     "type": "git",

@@ -6,15 +6,19 @@ const {
   dialog,
   protocol,
   net,
-  shell,
   session,
+  nativeImage,
+  nativeTheme,
+  clipboard,
 } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const { pathToFileURL } = require('node:url');
 const { randomUUID } = require('node:crypto');
-const { probe, exportVideo } = require('./media.cjs');
-const { isInstagram, blockedRoute, focusCSS, installFocus } = require('./policy.cjs');
+const { probe } = require('./media.cjs');
+const { isInstagram, blockedRoute, focusCSS, installFocus, themeScript } = require('./policy.cjs');
+const { attachFile } = require('./uploads.cjs');
+const { StoryService } = require('./stories.cjs');
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'focus-media',
@@ -24,39 +28,43 @@ protocol.registerSchemesAsPrivileged([
 let win,
   guest,
   guestCSS,
-  exportController,
-  lastExport,
+  stories,
   focus = true,
-  guestVisible = false,
-  guestPage = 'stories';
+  theme = 'light',
+  visible = false,
+  page = 'home',
+  viewport = { x: 0, y: 76, width: 1280, height: 784 };
 const media = new Map();
-const send = (channel, data) => {
-  if (win && !win.isDestroyed()) win.webContents.send(channel, data);
+const status = (type, message) => {
+  if (win && !win.isDestroyed()) win.webContents.send('app:status', { type, message });
 };
 function handle(name, fn) {
   ipcMain.handle(name, (event, ...args) => {
-    if (event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame)
+    if (!win || event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame)
       throw Error('Untrusted request.');
     return fn(...args);
   });
 }
-function bounds() {
-  if (guestVisible && guest && win) {
-    const [width, height] = win.getContentSize();
-    guest.setBounds({
-      x: 256,
-      y: 174,
-      width: Math.max(0, width - 288),
-      height: Math.max(0, height - 206),
-    });
-  }
+function setBounds() {
+  if (!win || !guest) return;
+  const [width, height] = win.getContentSize();
+  const x = Math.max(0, Math.min(width, Math.round(viewport.x))),
+    y = Math.max(0, Math.min(height, Math.round(viewport.y)));
+  guest.setBounds({
+    x,
+    y,
+    width: Math.max(0, Math.min(width - x, Math.round(viewport.width))),
+    height: Math.max(0, Math.min(height - y, Math.round(viewport.height))),
+  });
 }
-async function applyFocus() {
+async function apply() {
   if (!guest || guest.webContents.isDestroyed()) return;
   try {
     if (guestCSS) await guest.webContents.removeInsertedCSS(guestCSS);
     guestCSS = await guest.webContents.insertCSS(focusCSS);
     await guest.webContents.executeJavaScript(installFocus(focus));
+    await guest.webContents.executeJavaScript(themeScript(theme));
+    guest.setVisible(visible);
   } catch {}
 }
 function ensureGuest() {
@@ -72,64 +80,65 @@ function ensureGuest() {
   });
   win.contentView.addChildView(guest);
   guest.setVisible(false);
+  setBounds();
   const wc = guest.webContents;
   wc.setWindowOpenHandler(() => ({ action: 'deny' }));
   wc.on('will-navigate', (event, url) => {
     if (!isInstagram(url)) {
       event.preventDefault();
-      send(
-        'instagram:status',
-        'This login needs an external window. Use direct Instagram login here.'
-      );
+      status('error', 'External navigation was blocked. Use direct Instagram login.');
     } else if (blockedRoute(url, focus)) {
       event.preventDefault();
-      wc.loadURL('https://www.instagram.com/');
+      status('notice', 'Posts and Reels are blocked while focus mode is on.');
     }
   });
   wc.on('will-redirect', (event, url) => {
     if (!isInstagram(url)) event.preventDefault();
   });
-  wc.on('dom-ready', applyFocus);
+  wc.on('did-start-loading', () => guest?.setVisible(false));
+  wc.on('dom-ready', apply);
   wc.on('did-navigate-in-page', () => {
     if (blockedRoute(wc.getURL(), focus)) wc.loadURL('https://www.instagram.com/');
-    else applyFocus();
+    else apply();
   });
-  wc.on('did-finish-load', () =>
-    send('instagram:status', 'Instagram workspace · sign in directly to Instagram')
-  );
   wc.on('did-fail-load', (_, code, description, __, isMain) => {
     if (isMain && code !== -3)
-      send(
-        'instagram:status',
-        `Instagram could not load: ${description}. Try reopening the workspace.`
-      );
+      status('error', `Instagram could not load: ${description}. Use Reload to retry.`);
   });
-  wc.on('render-process-gone', () =>
-    send('instagram:status', 'Instagram stopped. Reopen the workspace to retry.')
-  );
-  const s = wc.session;
-  s.setPermissionRequestHandler((_, __, callback) => callback(false));
-  s.setPermissionCheckHandler(() => false);
-  s.on('will-download', (_, item) => {
-    const filename = path.basename(item.getFilename());
-    item.setSavePath(path.join(app.getPath('downloads'), filename));
-  });
+  wc.on('render-process-gone', () => status('error', 'Instagram stopped. Use Reload to retry.'));
+  wc.session.setPermissionRequestHandler((_, __, callback) => callback(false));
+  wc.session.setPermissionCheckHandler(() => false);
+}
+async function navigate(next) {
+  ensureGuest();
+  const target =
+    next === 'messages' ? 'https://www.instagram.com/direct/inbox/' : 'https://www.instagram.com/';
+  if (!guest.webContents.getURL() || page !== next) {
+    page = next;
+    try {
+      await guest.webContents.loadURL(target);
+    } catch (error) {
+      if (error.code !== 'ERR_ABORTED')
+        throw Error('Instagram could not load. Use Reload to retry.');
+    }
+  }
+  await apply();
 }
 app.whenReady().then(() => {
+  stories = new StoryService(app.getPath('userData'), (message) => status('progress', message));
   protocol.handle('focus-media', (request) => {
-    const id = new URL(request.url).hostname;
-    const item = media.get(id);
+    const item = media.get(new URL(request.url).hostname);
     if (!item) return new Response('Not found', { status: 404 });
     return net.fetch(pathToFileURL(item.path).toString(), { headers: request.headers });
   });
   win = new BrowserWindow({
-    width: 1440,
-    height: 960,
-    minWidth: 1120,
-    minHeight: 780,
-    backgroundColor: '#111411',
+    width: 1280,
+    height: 900,
+    minWidth: 760,
+    minHeight: 600,
+    backgroundColor: '#faf9f7',
     title: 'Focus Gram',
-    icon: path.join(__dirname, '../public/icon.png'),
+    icon: path.join(__dirname, '../dist/icon.png'),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -139,95 +148,46 @@ app.whenReady().then(() => {
     },
   });
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  win.webContents.on('will-navigate', (e) => e.preventDefault());
-  win.on('resize', bounds);
+  win.webContents.on('will-navigate', (event) => event.preventDefault());
+  win.on('resize', setBounds);
   win.on('closed', () => {
-    exportController?.abort();
     if (guest && !guest.webContents.isDestroyed()) guest.webContents.close();
     guest = null;
     win = null;
   });
-  handle('media:import', async (kind) => {
-    const audio = kind === 'audio';
-    const result = await dialog.showOpenDialog(win, {
-      title: audio ? 'Choose a soundtrack' : 'Add your clips',
-      properties: audio ? ['openFile'] : ['openFile', 'multiSelections'],
-      filters: [
-        {
-          name: audio ? 'Audio' : 'Video',
-          extensions: audio
-            ? ['mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac']
-            : ['mp4', 'mov', 'mkv', 'webm', 'm4v'],
-        },
-      ],
-    });
-    if (result.canceled) return [];
-    const items = [];
-    for (const file of result.filePaths) {
-      const info = await probe(file);
-      if (!info.duration || (!audio && info.kind !== 'video'))
-        throw Error('That file has no playable media.');
-      const id = randomUUID();
-      const item = {
-        ...info,
-        id,
-        name: path.basename(file),
-        path: file,
-        url: `focus-media://${id}/media`,
-      };
-      media.set(id, item);
-      const { path: _, ...publicItem } = item;
-      items.push(publicItem);
-    }
-    return items;
-  });
-  handle('media:export', async (project) => {
-    if (exportController) throw Error('An export is already running.');
-    const result = await dialog.showSaveDialog(win, {
-      title: 'Export your reel',
-      defaultPath: path.join(app.getPath('videos'), 'focus-gram-reel.mp4'),
-      filters: [{ name: 'MP4 video', extensions: ['mp4'] }],
-    });
-    if (result.canceled) return null;
-    exportController = new AbortController();
-    try {
-      const out = await exportVideo(project, media, result.filePath, {
-        signal: exportController.signal,
-        onProgress: (value) => send('export:progress', value),
-      });
-      lastExport = out.path;
-      return { name: path.basename(out.path), duration: out.duration };
-    } finally {
-      exportController = null;
-    }
-  });
-  handle('media:cancel', () => exportController?.abort());
-  handle('media:reveal', () => {
-    if (lastExport) shell.showItemInFolder(lastExport);
+  handle('instagram:bounds', (value) => {
+    if (
+      !value ||
+      !['x', 'y', 'width', 'height'].every(
+        (key) => typeof value[key] === 'number' && Number.isFinite(value[key])
+      )
+    )
+      return;
+    viewport = value;
+    setBounds();
   });
   handle('instagram:state', async (state) => {
-    if (!state || typeof state !== 'object') throw Error('Invalid workspace state');
+    if (!state || typeof state !== 'object') throw Error('Invalid workspace state.');
     focus = state.focus !== false;
-    guestVisible = state.visible === true;
-    const page = ['stories', 'messages', 'upload'].includes(state.page) ? state.page : 'stories';
-    if (guestVisible) {
-      const fresh = !guest;
-      ensureGuest();
-      guest.setVisible(true);
-      bounds();
-      if (fresh || guestPage !== page) {
-        guestPage = page;
-        await guest.webContents.loadURL(
-          page === 'messages'
-            ? 'https://www.instagram.com/direct/inbox/'
-            : 'https://www.instagram.com/'
-        );
-      }
-      await applyFocus();
-    } else guest?.setVisible(false);
+    visible = state.visible === true;
+    if (visible) await navigate(state.page === 'messages' ? 'messages' : 'home');
+    else guest?.setVisible(false);
     return true;
   });
+  handle('app:theme', async (value) => {
+    theme = value === 'dark' ? 'dark' : 'light';
+    nativeTheme.themeSource = theme;
+    win.setBackgroundColor(theme === 'dark' ? '#171717' : '#faf9f7');
+    await apply();
+  });
+  handle('instagram:refresh', async () => {
+    ensureGuest();
+    if (guest.webContents.isCrashed()) {
+      await guest.webContents.loadURL('https://www.instagram.com/');
+    } else guest.webContents.reload();
+  });
   handle('instagram:reset', async () => {
+    if (stories.publishing) throw Error('Wait for the Story upload to finish.');
     if (guest) {
       win.contentView.removeChildView(guest);
       guest.webContents.close();
@@ -235,7 +195,78 @@ app.whenReady().then(() => {
       guestCSS = null;
     }
     await session.fromPartition('persist:focus-gram-instagram').clearStorageData();
-    return true;
+    await navigate('home');
+  });
+  handle('upload:select', async (kind) => {
+    const result = await dialog.showOpenDialog(win, {
+      title:
+        kind === 'story' ? 'Choose a Story' : kind === 'reel' ? 'Choose a reel' : 'Choose a post',
+      properties: ['openFile'],
+      filters: [
+        {
+          name: kind === 'reel' ? 'Video' : 'Photo or video',
+          extensions: kind === 'reel' ? ['mp4'] : ['jpg', 'jpeg', 'png', 'webp', 'mp4'],
+        },
+      ],
+    });
+    if (result.canceled) return null;
+    const file = result.filePaths[0],
+      info = await fs.stat(file);
+    if (info.size > 500 * 1024 * 1024) throw Error('Choose a file smaller than 500 MB.');
+    const id = randomUUID(),
+      isVideo = path.extname(file).toLowerCase() === '.mp4';
+    let details;
+    if (isVideo) {
+      details = await probe(file);
+      if (details.kind !== 'video') throw Error('That file is not a video.');
+    } else {
+      const image = nativeImage.createFromPath(file);
+      if (image.isEmpty()) throw Error('That image could not be opened.');
+      details = { kind: 'image', ...image.getSize() };
+    }
+    const item = {
+      ...details,
+      id,
+      path: file,
+      name: path.basename(file),
+      url: `focus-media://${id}/media`,
+    };
+    media.set(id, item);
+    const { path: _, ...safe } = item;
+    return safe;
+  });
+  handle('upload:composer', async (payload) => {
+    const file = media.get(payload?.id);
+    if (!file) throw Error('Choose a file first.');
+    if (!['post', 'reel'].includes(payload.kind)) throw Error('Invalid upload type.');
+    if (payload.kind === 'reel' && file.kind !== 'video') throw Error('Choose a video for a reel.');
+    const cookies = await session
+      .fromPartition('persist:focus-gram-instagram')
+      .cookies.get({ url: 'https://www.instagram.com/' });
+    if (!cookies.some((c) => c.name === 'sessionid')) throw Error('Sign in to Instagram first.');
+    await navigate('home');
+    await attachFile(guest.webContents, file, payload.kind);
+    const caption = String(payload.caption || '').slice(0, 2200);
+    if (caption) clipboard.writeText(caption);
+    visible = true;
+    guest.setVisible(true);
+    return {
+      message: caption
+        ? 'File loaded. Caption copied—paste it and finish sharing in Instagram.'
+        : 'File loaded. Finish sharing in Instagram.',
+    };
+  });
+  handle('story:capabilities', async () => ({ ready: await stories.ready(), experimental: true }));
+  handle('story:prepare', () => stories.setup());
+  handle('story:publish', async (payload) => {
+    if (payload?.acknowledged !== true)
+      throw Error('Acknowledge the experimental integration before publishing.');
+    const file = media.get(payload.id);
+    if (!file) throw Error('Choose a Story file first.');
+    const cookies = await session
+      .fromPartition('persist:focus-gram-instagram')
+      .cookies.get({ url: 'https://www.instagram.com/' });
+    return stories.publish(file, cookies);
   });
   win.loadFile(path.join(__dirname, '../dist/index.html'));
 });

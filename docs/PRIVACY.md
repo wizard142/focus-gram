@@ -1,14 +1,14 @@
 # Privacy
 
-Focus Gram has no telemetry or analytics endpoint.
+Focus Gram has no analytics or hosted backend.
 
-- Source media stays on your device unless you manually upload it through Instagram.
-- Video processing runs in local FFmpeg child processes.
-- Editor preferences, title text and caption are saved in localStorage. Clip references are kept only for the current session.
-- Instagram cookies and web storage are kept in Electron's `persist:focus-gram-instagram` session under the app data directory. Use App settings → Sign out and clear Instagram session to clear them.
-- Instagram remains a third-party network service, governed by Meta's own policies. Focus mode changes the page you see; it does not stop all Instagram network requests or tracking.
-- Native import registers selected files for preview through a restricted custom protocol. Files are not copied into the repository or uploaded by the editor.
-- Export uses a temporary directory that is removed when processing completes or is cancelled. A process crash may leave temporary data; use your system's temporary-file cleanup.
-- Packaged apps have no auto-update service. Development installs and builds contact npm/Electron distribution servers for dependencies.
+- Instagram cookies remain in the existing `persist:focus-gram-instagram` Electron session. Sign out in Settings to clear them. The helper never asks for your password.
+- Selected files stay local until you continue into Instagram's composer or explicitly publish a Story. Normal Post/Reel handoff gives Instagram's webpage access to the chosen file.
+- Experimental Story publication sends your selected media directly to Instagram using the local instagrapi helper. Necessary session cookies travel from the app's main process to that helper over stdin. They are not exposed to the UI, command arguments or logs, and no extra session file is written.
+- The helper forces the requests transport and restricts outgoing requests to Instagram and its media CDN hosts. No token service is used.
+- One-time Story setup contacts PyPI to install pinned dependencies into a virtual environment in app data. Package dependencies have their own licenses.
+- Video preparation creates temporary local files, removed on completion or failure. A crash may leave temporary files for system cleanup.
+- Theme, focus and experimental-feature preferences are saved locally. The caption is copied to your system clipboard only when you continue to Instagram and the app tells you it has done so.
+- Instagram's own network activity remains governed by Meta's policies. Focus mode changes visibility and navigation; it does not remove tracking from Instagram.
 
-Do not put account credentials, session cookies, source videos, or private messages in GitHub issues.
+Don't put cookies, tokens, private media or messages into GitHub issues.

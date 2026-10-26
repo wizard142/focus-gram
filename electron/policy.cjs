@@ -22,8 +22,6 @@ html[data-focus-gram="on"] a[href^="/reels/"],
 html[data-focus-gram="on"] a[href^="/explore/"],
 html[data-focus-gram="on"] a[href^="/p/"] { display:none !important; }
 html[data-focus-gram="on"] body main { min-height:80vh; }
-#focus-gram-note { margin:24px auto;max-width:460px;padding:18px 24px;background:#18221b;color:#d5fb78;border-radius:16px;font:14px/1.6 system-ui; text-align:center; }
-html:not([data-focus-gram="on"]) #focus-gram-note {display:none!important;}
 `;
 // This function runs only in Instagram's isolated renderer, with no Node bridge.
 function installFocus(focus) {
@@ -36,11 +34,7 @@ function installFocus(focus) {
   document.documentElement.dataset.focusGramPage=location.pathname==='/'?'home':'other';
   if(!enabled)return;
   if(blocked.test(location.pathname)){location.replace('https://www.instagram.com/');return;}
-  if(location.pathname==='/'){
-   let note=document.getElementById('focus-gram-note');
-   const main=document.querySelector('main');
-   if(main&&!note){note=document.createElement('div');note.id='focus-gram-note';note.textContent='Focus mode is on. Your Stories stay; the feed can wait.';main.append(note);}
-  } else { document.getElementById('focus-gram-note')?.remove(); }
+
  };
  const click=e=>{const a=e.target.closest?.('a[href]');if(enabled&&a&&blocked.test(new URL(a.href,location.href).pathname)){e.preventDefault();e.stopImmediatePropagation();}};
  document.addEventListener('click',click,true);
@@ -50,4 +44,13 @@ function installFocus(focus) {
  })()`;
   return source;
 }
-module.exports = { isInstagram, blockedRoute, focusCSS, installFocus };
+function themeScript(theme) {
+  const dark = theme === 'dark';
+  return `(() => {
+    document.documentElement.classList.toggle('__fb-dark-mode', ${dark});
+    document.documentElement.classList.toggle('__fb-light-mode', ${!dark});
+    document.documentElement.style.colorScheme=${JSON.stringify(theme)};
+    try {localStorage.setItem('theme',${JSON.stringify(theme)});}catch{}
+  })()`;
+}
+module.exports = { isInstagram, blockedRoute, focusCSS, installFocus, themeScript };

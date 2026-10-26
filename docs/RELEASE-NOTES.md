@@ -1,27 +1,23 @@
-# Focus Gram v0.1.0 — early alpha
+# Focus Gram v0.2.0
 
-The first Linux desktop build of Focus Gram: a local reel editor and a focused Instagram workspace.
+A smaller interface, real composer handoff, and experimental personal-account Story uploads.
 
-## Included
+## Changes
 
-- Multiple video clips, per-clip trimming and reordering.
-- 9:16 portrait canvas, fill/fit framing, text overlay and local soundtrack mixing.
-- Local FFmpeg export to 720p/1080p H.264 + AAC MP4, without a watermark.
-- A separate sandboxed Instagram session with focus-mode route blocking and feed filtering designed to preserve Stories and messages.
-- Caption drafting and a manual handoff to Instagram's own web uploader.
+- Removed the built-in video editor, sample project, export flow, promotional headings and dashboard cards.
+- Instagram now occupies the window below one compact toolbar.
+- Added persistent light/dark themes and bundled Instrument Sans typography.
+- Create → Post/Reel now opens Instagram's actual composer and selects your finished file. Captions are copied for pasting. You review and share in Instagram; no project downloads are involved.
+- Added opt-in experimental photo/video Story publishing using the existing app session and a local instagrapi helper. No phone or Android container is required.
 
-## Download and run
+## Stories
 
-Install FFmpeg first (`sudo pacman -S ffmpeg` on CachyOS/Arch). Mark the AppImage executable and open it. If FUSE is unavailable, run the AppImage with `--appimage-extract-and-run`. Alternatively, extract the tarball and run `focus-gram` inside it. Do not disable Electron's sandbox.
+Requires Python 3.11+, FFmpeg and one-time setup in Create → Story. Uses unofficial Instagram APIs; it may fail or trigger verification. Explicit acknowledgement is required before each immediate publication. Mobile music, stickers, effects and full mobile feature parity are not included.
 
-`SHA256SUMS.txt` lists artifact checksums. Builds are not code signed.
+No live-account Story was published in testing. Local preparation, dependency setup, session/error handling and mocked publication responses are tested. Normal composer handoff and focus filtering are tested with an isolated native fixture, not your account.
 
-## Tested
+## Linux
 
-Local engine tests include a real FFmpeg export with combined trims, a literal text overlay, a soundtrack, and cancellation. Browser tests exercise import, preview, trim, text, settings persistence, publish UI, and focus-mode DOM fixtures. The packaged Linux desktop app passed native import, playback, MP4 export, and sandbox checks on CachyOS.
+AppImage and tarball are attached, with SHA256 checksums. System FFmpeg and Python are not bundled. Keep Electron's sandbox enabled. If FUSE is unavailable, use `--appimage-extract-and-run`.
 
-## Read before trying Instagram
-
-Authenticated login, Stories, messaging, and upload have not been verified with a real account. Instagram may reject embedded browsers or change its layout. Focus filtering is best effort. No direct API publishing, Instagram music catalog, AR effects, mobile feature parity, or calls. Clip lists are session-only; editor preferences persist.
-
-This project is independent and not affiliated with Instagram or Meta. See README and docs/LIMITATIONS.md for details.
+Your existing Instagram session uses the same application data and partition as v0.1. Editor settings are no longer used. Builds are unsigned and have no automatic update service.

@@ -1,52 +1,30 @@
-<div align="center">
-<img src="public/icon.png" width="74" alt="Focus Gram icon" />
-
 # Focus Gram
 
-### Create more. Scroll less.
+A focused Instagram client for Linux.
 
-A Linux-first reel studio and focused Instagram workspace.<br/>
-Trim your clips, make your reel, and keep up with Stories without opening the endless feed.
+Instagram takes up the window. A small toolbar adds focus mode, light/dark themes, and file upload controls. Edit videos in your normal editor; Focus Gram no longer includes a video editor.
 
-[![CI](https://github.com/wizard142/focus-gram/actions/workflows/ci.yml/badge.svg)](https://github.com/wizard142/focus-gram/actions/workflows/ci.yml)
-![License: MIT](https://img.shields.io/badge/license-MIT-d3f990)
-![Status: early alpha](https://img.shields.io/badge/status-early_alpha-728863)
-![Platform: Linux](https://img.shields.io/badge/platform-Linux-242d20)
+![Create in Focus Gram](docs/screenshots/create.png)
 
-</div>
+## Features
 
-![Focus Gram editor](docs/screenshots/editor.png)
+- **Focus mode:** hide home-feed posts, Reels and Explore while keeping Stories and messages.
+- **Light and dark themes:** saved locally, including Instagram's appearance.
+- **Post / Reel:** select a finished photo or MP4, load it into Instagram's actual composer, and finish sharing there. A caption is copied for pasting. No project export or download step.
+- **Experimental Story uploads:** publish a photo or a video up to 60 seconds using your existing Instagram session. Works through an unofficial integration intended for personal accounts; requires explicit enablement and acknowledgement before each publication.
 
-## Why this exists
+## Important limits
 
-Sometimes you open Instagram to post a reel or check a friend's Story, and spend the next half hour scrolling. Focus Gram is an experiment in keeping the useful parts of Instagram close while making space to create.
+Story uploads use [instagrapi](https://github.com/subzeroid/instagrapi), not a supported Meta API. They may fail or trigger account verification. The helper has been checked locally with real dependencies and mocked upload responses; **no live-account Story has been published during testing**. Mobile-only music, stickers, effects and calls are not included. This is not full mobile-app parity.
 
-It combines a local video editor with an isolated Instagram web workspace. It does **not** reproduce Instagram's mobile app or unlock mobile-only features.
+Instagram can change its markup, block embedded login, or reject a session imported from the web client. Composer transfer and focus filtering have browser and native fixture tests, not a guarantee for every account or Instagram release. Finish normal post/Reel publication in Instagram; only the experimental Story button publishes immediately.
 
-## What works in v0.1
+## Install on CachyOS / Arch
 
-- Import multiple local video clips and preview them.
-- Trim each clip, reorder your sequence, and remove clips.
-- Fill a portrait canvas or fit the full image with letterboxing.
-- Add a text overlay and choose its position.
-- Mix original audio with a local soundtrack; control both volumes.
-- Render 720p or 1080p portrait MP4s with FFmpeg. Exports have no Focus Gram watermark.
-- Open Instagram in a persistent, separate, sandboxed session.
-- Turn on focus mode to hide home-feed articles and post/Reel/Explore links, and block those routes. Stories and DMs remain accessible.
-- Draft and copy a caption, then open Instagram to upload through its own Create flow.
-
-**The editor and FFmpeg pipeline are tested. Instagram filtering has automated DOM fixture tests, but authenticated Stories, messaging, and uploading have not been verified with a real account.** Instagram changes its layout and may reject embedded browsers. This is an early alpha, not a promise of complete Instagram compatibility. See [limitations](docs/LIMITATIONS.md).
-
-## Download
-
-[Linux alpha downloads](https://github.com/wizard142/focus-gram/releases/tag/v0.1.0) include an AppImage and portable tarball. Install system FFmpeg before using the editor. Source setup is below.
-
-## Run on CachyOS / Arch Linux
-
-Requires Node.js **22.12+**, npm, `ffmpeg`, and `ffprobe` (both provided by the FFmpeg package). Current Node LTS is recommended.
+[Download the Linux alpha](https://github.com/wizard142/focus-gram/releases/tag/v0.2.0), or run from source:
 
 ```bash
-sudo pacman -S --needed nodejs npm ffmpeg git
+sudo pacman -S --needed nodejs npm ffmpeg git python
 
 git clone https://github.com/wizard142/focus-gram.git
 cd focus-gram
@@ -54,64 +32,45 @@ npm ci
 npm start
 ```
 
-If your npm configuration blocks Electron's install script and you see “Electron failed to install correctly,” run `node node_modules/electron/install.js`, then retry `npm start`.
+Requires Node.js 22.12+ and FFmpeg/ffprobe for video metadata and Story preparation. If your npm setup blocks Electron's install script, run `node node_modules/electron/install.js` before starting.
 
-Log in directly to Instagram inside the Stories or Messages workspace. Focus Gram has no account registration, password form, analytics, or hosted backend. Camera/microphone permission requests are currently denied, so calling is not supported.
+### Upload a post or Reel
 
-### Browser preview
+1. Sign in directly to Instagram inside the app.
+2. Click **Create**, choose **Post** or **Reel**, and select a finished file.
+3. Click **Continue in Instagram**. Review it in Instagram's composer, paste your caption if provided, and share.
 
-```bash
-npm run dev
-```
+The transfer selects the file in Instagram's own file input using Electron's DevTools protocol. It does not press Instagram's final Share button. If Instagram's Create button cannot be located, Focus Gram reports the failure and you can open the uploader manually.
 
-Open the local URL printed by Vite. Browser preview supports video import, preview, trim and editor controls. FFmpeg export and the embedded Instagram workspace require Electron. “Try a sample” loads an original generated landscape clip; import a local video to export.
+### Upload a Story — experimental
 
-### Package for Linux
+1. Open **Create → Story** and enable the experimental integration.
+2. Click **Set up** once. This creates a local Python virtual environment in the app's data directory and installs pinned `instagrapi==3.2.1` dependencies from PyPI. Python 3.11+ and internet access are required; Debian/Ubuntu users may also need `python3-venv`.
+3. Choose a photo or MP4. Prepare edits, audio and text in an external editor first.
+4. Check the acknowledgement and click **Publish Story**. This publishes immediately; there is no separate Instagram review screen.
 
-```bash
-npm run pack  # unpacked desktop app in release/linux-unpacked/
-npm run dist  # AppImage and tar.gz in release/
-```
+No Instagram password is requested by the helper. The current app session is passed privately to the local helper over stdin, never through process arguments or repository files. It is not saved as a second session file. Credentials stay in the existing Electron session. If Instagram asks for verification, stop and complete it in Instagram before another attempt. If publication is unconfirmed, check your Story before retrying to avoid duplicates.
 
-FFmpeg is a system dependency and is not bundled. Electron's Linux sandbox must remain enabled; don't work around startup issues with `--no-sandbox`. Your distribution must support unprivileged user namespaces or a correctly configured Electron sandbox. Run AppImages with `--appimage-extract-and-run` if FUSE is unavailable.
+### Themes
 
-## How focus mode works
+Use the sun/moon buttons in the toolbar, or Settings → Appearance. The app saves your preference locally and updates Electron's native theme plus Instagram's theme classes.
 
-The local editor and remote Instagram content run in separate renderers. The Instagram renderer has no Node.js access and no app preload bridge. Session cookies stay in Electron's application data on the current device.
-
-With focus enabled, the app:
-
-1. Injects CSS that hides home-feed articles, post links, Reel links, and Explore links. It avoids hiding login forms and Story viewer articles.
-2. Blocks navigation to `/p/`, `/reel/`, `/reels/`, and `/explore/` routes, including single-page navigation.
-3. Preserves `/stories/`, `/direct/`, account login routes, and creation routes.
-
-Focus mode is an attention aid, not a parental control or network content firewall. It does not filter Instagram's underlying API responses. A layout change, new route, embedded content in a message, or an Instagram experiment can affect coverage. Profile post links are also hidden when focus is enabled. Turn focus off to deliberately browse posts.
-
-## Publishing
-
-Export first, then open the publishing card, copy your caption, and upload with Instagram's Create button. This is Instagram's web uploader, with its existing account and format restrictions.
-
-Direct API publishing is **not implemented**. Meta's Instagram publishing APIs serve eligible professional accounts and require app setup and permissions. They do not provide a full replacement for the mobile app. No unofficial mobile endpoints, extracted session tokens, or hidden auto-posting are used.
-
-## Development and checks
+## Development
 
 ```bash
-npm test                    # route/validation tests and real FFmpeg integration
+npm run dev                  # browser preview; no account or uploads
+npm test                     # route and composer tests
+npm run test:stories          # Python helper tests, no network
 npx playwright install chromium
-npm run test:ui             # browser interactions + focus DOM fixtures
-npm run build
-node tests/desktop.mjs      # native Electron smoke test; requires a display and FFmpeg
+npm run test:ui               # browser controls and focus fixtures
+npm run test:desktop          # isolated native fixture tests, no real posts
+npm run dist                 # Linux AppImage and tarball
 ```
 
-Use `FG_CHROMIUM=/usr/bin/chromium npm run test:ui` to test with system Chromium. Native tests use a temporary profile and mocked file dialogs, not your Instagram login.
+Set `FG_CHROMIUM=/usr/bin/chromium` to use system Chromium. Set `FG_TEST_STORY_SETUP=1` for native tests to install/check the Python runtime in their temporary app profile. Native tests require a Linux display. Tests never reuse your real Instagram profile.
 
-Stack: React, Vite, Electron `WebContentsView`, Lucide icons, system FFmpeg. See [architecture](docs/ARCHITECTURE.md), [privacy](docs/PRIVACY.md), and [contributing](CONTRIBUTING.md).
+Don't disable Electron's sandbox to work around packaging problems. Use `--appimage-extract-and-run` if your system lacks FUSE.
 
-## Next
+[Architecture](docs/ARCHITECTURE.md) · [Privacy](docs/PRIVACY.md) · [Limitations](docs/LIMITATIONS.md) · [Contributing](CONTRIBUTING.md)
 
-- Test authenticated Instagram flows on more Linux desktops.
-- Add project save/reopen with missing-file recovery.
-- Improve captions, text layout, and timeline seeking.
-- Add a tested professional-account publishing integration if there is demand.
-
-MIT licensed. Independent community project; not affiliated with, endorsed by, or sponsored by Instagram or Meta. Instagram is a trademark of its respective owner.
+Instrument Sans is bundled under the [SIL Open Font License](docs/FONT-LICENSE.txt). Focus Gram is MIT licensed, independent, and not affiliated with Instagram or Meta.

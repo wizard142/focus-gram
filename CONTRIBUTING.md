@@ -1,12 +1,9 @@
 # Contributing
 
-Keep Focus Gram honest about its capabilities. A web workspace cannot promise mobile-app feature parity.
+Focus Gram is an Instagram client with focus controls. Keep the interface small. Use external editors for media editing.
 
-1. Install dependencies and system FFmpeg.
-2. Run `npm test`, `npm run build`, and `npm run test:ui` for changes to the editor or filtering.
-3. For native behavior, build and run `node tests/desktop.mjs` in a Linux desktop session.
-4. Include reproduction steps and test results with your PR.
+Run `npm test`, `npm run test:stories`, `npm run test:ui`, and `npm run build`. Native changes should also run `npm run test:desktop` in a Linux desktop session. Tests must use isolated fixtures and must not publish to a real account.
 
-For focus-mode changes, preserve Story viewers and login forms. Add fixture coverage before broadening selectors. Do not expose Node or the app bridge to Instagram, disable the sandbox, or use unofficial mobile endpoints.
+Preserve the sandbox, separate Instagram session, and narrow IPC boundary. Never expose cookies to the React renderer or put credentials into logs or process arguments. Don't add automatic login retries or silent publication. Changes to the experimental Story integration must keep the acknowledgement and uncertainty handling.
 
-Please open a focused issue before starting a major feature. Never post secrets or private account data.
+For focus filtering, preserve login fields, Story viewers, messages and creation flows. Include representative DOM fixtures when changing selectors.

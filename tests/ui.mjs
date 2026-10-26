@@ -2,8 +2,8 @@ import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import fs from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const { focusCSS, installFocus } = require('../electron/policy.cjs');
@@ -19,10 +19,10 @@ let browser;
 const errors = [];
 try {
   await new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(Error('Vite did not start')), 20000);
-    server.stdout.on('data', (d) => {
-      if (String(d).includes('5198')) {
-        clearTimeout(timeout);
+    const timer = setTimeout(() => reject(Error('Vite startup timed out')), 20000);
+    server.stdout.on('data', (chunk) => {
+      if (String(chunk).includes('5198')) {
+        clearTimeout(timer);
         resolve();
       }
     });
@@ -33,36 +33,19 @@ try {
     ...(process.env.FG_CHROMIUM ? { executablePath: process.env.FG_CHROMIUM } : {}),
   });
   const page = await browser.newPage({
-    viewport: { width: 1440, height: 1080 },
+    viewport: { width: 1360, height: 900 },
     deviceScaleFactor: 1,
   });
-  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('http://127.0.0.1:5198');
-  await page.getByRole('heading', { name: /A little more creating/ }).waitFor();
-  await page.screenshot({ path: path.join(output, 'studio.png'), fullPage: true });
-  await page.getByRole('button', { name: 'Try a sample' }).click();
-  await page.locator('video').waitFor();
-  await page.getByRole('button', { name: 'Play preview', exact: true }).click();
-  await page.waitForFunction(() => document.querySelector('video')?.currentTime > 0.2);
-  await page.getByRole('button', { name: 'Pause preview', exact: true }).click();
-  await page.getByRole('button', { name: 'Text', exact: true }).click();
-  await page.getByLabel('Text overlay').fill('Create more. Scroll less.');
-  await page.getByRole('button', { name: 'center', exact: true }).click();
-  assert.equal(
-    await page.locator('.text-overlay.center').textContent(),
-    'Create more. Scroll less.'
-  );
-  await page.getByRole('button', { name: 'Edit', exact: true }).click();
-  await page.getByLabel('Trim start').fill('1');
-  await page.getByLabel('Trim end').fill('6');
-  assert.match(await page.locator('.timeline-title').textContent(), /00:05/);
+  await page.getByRole('heading', { name: 'Instagram', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Light theme', exact: true }).click();
+  await page.screenshot({ path: path.join(output, 'light.png') });
+  await page.getByRole('button', { name: 'Dark theme', exact: true }).click();
+  await page.reload();
+  assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
+  await page.screenshot({ path: path.join(output, 'dark.png') });
   await page.getByRole('switch', { name: 'Focus mode', exact: true }).click();
-  assert.equal(
-    await page
-      .getByRole('switch', { name: 'Focus mode', exact: true })
-      .getAttribute('aria-checked'),
-    'false'
-  );
   await page.reload();
   assert.equal(
     await page
@@ -71,39 +54,30 @@ try {
     'false'
   );
   await page.getByRole('switch', { name: 'Focus mode', exact: true }).click();
-  // Browser imports use the same UI editing path as desktop imports.
-  await page
-    .locator('input[type=file][accept="video/*"]')
-    .setInputFiles(path.join(root, 'public/demo.mp4'));
-  await page
-    .getByRole('button', { name: 'Export reel', exact: true })
-    .waitFor({ state: 'visible' });
-  await page.waitForFunction(() =>
-    document.querySelector('.timeline-title')?.textContent.includes('1 clip')
-  );
-  await page.getByLabel('Trim start').fill('1');
-  await page.getByLabel('Trim end').fill('7');
-  await page.getByRole('button', { name: 'Export reel', exact: true }).click();
-  await page.getByRole('dialog').waitFor();
-  assert.match(await page.getByRole('dialog').textContent(), /require the desktop app/);
+  await page.getByRole('button', { name: 'Create', exact: true }).click();
+  await page.getByRole('tab', { name: 'Reel', exact: true }).click();
+  await page.locator('input[type=file]').setInputFiles(path.join(root, 'tests/fixtures/reel.mp4'));
+  await page.getByLabel('Caption', { exact: true }).fill('A finished project.');
+  await page.screenshot({ path: path.join(output, 'create.png') });
+  await page.getByRole('button', { name: 'Continue in Instagram', exact: true }).click();
+  assert.match(await page.getByRole('alert').textContent(), /desktop app/);
+  await page.getByRole('tab', { name: /Story/ }).click();
+  await page.getByRole('button', { name: 'Enable experimental Stories', exact: true }).click();
+  await page.locator('input[type=file]').setInputFiles(path.join(root, 'public/icon.png'));
+  await page.getByRole('checkbox').check();
+  await page.getByRole('button', { name: 'Publish Story', exact: true }).click();
+  assert.match(await page.getByRole('alert').textContent(), /desktop app/);
   await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
-  await page.screenshot({ path: path.join(output, 'editor.png'), fullPage: true });
-  await page.getByRole('button', { name: /Made something you love/ }).click();
-  await page.getByLabel('Your caption', { exact: true }).fill('Made with Focus Gram.');
-  await page.screenshot({ path: path.join(output, 'publish.png'), fullPage: true });
-  await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
-  await page.getByRole('button', { name: 'Stories', exact: true }).click();
-  await page.getByRole('heading', { name: 'Your people. Less noise.' }).waitFor();
-  await page.getByRole('button', { name: 'Back to studio', exact: true }).click();
-  await page.getByLabel('Remove clip 1', { exact: true }).click();
-  assert.match(await page.locator('.timeline-title').textContent(), /0 clips/);
-  // Exercise focus injection against a representative DOM, including Story articles and login forms.
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Light', exact: true }).click();
+  assert.equal(await page.locator('html').getAttribute('data-theme'), 'light');
+  await page.keyboard.press('Escape');
+  assert.equal(await page.getByRole('dialog').count(), 0);
   const fixture = await browser.newPage();
+  const markup =
+    '<main><div id="stories"><a href="/stories/friend/1/">Story</a></div><article id="post">Post<form><input placeholder="Add a comment"/></form></article><a id="reel" href="/reels/">Reels</a><a id="dm" href="/direct/inbox/">Messages</a><button id="create">Create</button></main>';
   await fixture.route('https://www.instagram.com/**', (route) =>
-    route.fulfill({
-      contentType: 'text/html',
-      body: '<main><div id="stories"><a href="/stories/friend/1/">Story</a></div><article id="post">A feed post<form><input placeholder="Add a comment"/></form></article><a id="reel" href="/reels/">Reels</a><a id="dm" href="/direct/inbox/">Messages</a></main>',
-    })
+    route.fulfill({ contentType: 'text/html', body: markup })
   );
   await fixture.goto('https://www.instagram.com/');
   await fixture.addStyleTag({ content: focusCSS });
@@ -112,36 +86,25 @@ try {
   assert.equal(await fixture.locator('#reel').isVisible(), false);
   assert.equal(await fixture.locator('#stories').isVisible(), true);
   assert.equal(await fixture.locator('#dm').isVisible(), true);
+  assert.equal(await fixture.locator('#create').isVisible(), true);
   await fixture.evaluate(installFocus(false));
   assert.equal(await fixture.locator('#post').isVisible(), true);
   await fixture.goto('https://www.instagram.com/stories/friend/1/');
   await fixture.addStyleTag({ content: focusCSS });
   await fixture.evaluate(installFocus(true));
-  assert.equal(
-    await fixture.locator('#post').isVisible(),
-    true,
-    'Story viewer articles must remain visible'
-  );
+  assert.equal(await fixture.locator('#post').isVisible(), true);
   await fixture.goto('https://www.instagram.com/');
-  await fixture
-    .locator('main')
-    .innerHTML()
-    .then(async () =>
-      fixture.evaluate(() => {
-        document.querySelector('main').innerHTML =
-          '<article id="login"><form><input name="username" placeholder="Username"/><input type="password"/></form></article>';
-      })
-    );
+  await fixture.evaluate(
+    () =>
+      (document.querySelector('main').innerHTML =
+        '<article id="login"><form><input name="username"/><input type="password"/></form></article>')
+  );
   await fixture.addStyleTag({ content: focusCSS });
   await fixture.evaluate(installFocus(true));
-  assert.equal(
-    await fixture.locator('#login').isVisible(),
-    true,
-    'Login forms must remain visible'
-  );
+  assert.equal(await fixture.locator('#login').isVisible(), true);
   assert.deepEqual(errors, []);
   console.log(
-    'UI passed: import, trim, preview, text, export gating, focus persistence, publish, removal, and focus DOM fixtures.'
+    'UI passed: themes, persistence, focus, upload controls, Story acknowledgement, honest browser limitations, and filtering fixtures.'
   );
 } finally {
   await browser?.close();
