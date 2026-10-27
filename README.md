@@ -1,6 +1,26 @@
 # Focus Gram
 
-A focused Instagram client for Linux.
+A focused Instagram app for Linux.
+
+## Native desktop app
+
+The new native shell runs the real Instagram Android app inside a GTK window. **Create** opens your desktop file picker; only the selected file goes into Instagram’s editor. **Focus** covers feed posts and blocks Reels/Explore while keeping the Stories tray, DMs and creation editors available.
+
+It uses KVM, a smaller render surface, host OpenGL, Quick Boot, and automatic pause when minimized. Fast reopen keeps Android paused in memory after closing; **Quit completely** releases it. Android remains the main resource cost.
+
+See [native setup and requirements](native/README.md). This source version uses a configured official Google Play emulator; SDK images, account data and the local signing key are not included in the repository.
+
+```sh
+bash native/companion/build.sh
+bash native/install.sh
+bash native/launch.sh
+```
+
+The focus helper has no network permission and does not save screen contents. It is a local screen filter whose selectors may need updates when Instagram changes.
+
+## Earlier web client — v0.2.1
+
+The downloadable v0.2.1 AppImage below is the earlier Electron/web client, with the limitations described here.
 
 Instagram takes up the window. A small toolbar adds focus mode, light/dark themes, and file upload controls. Edit videos in your normal editor; Focus Gram no longer includes a video editor.
 
