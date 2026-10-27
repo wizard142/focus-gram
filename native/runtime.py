@@ -13,6 +13,8 @@ ADB = DATA / 'sdk/platform-tools/adb'
 SERIAL = 'emulator-5556'
 PACKAGE = 'io.github.wizard142.focusgram'
 COMPONENT = PACKAGE + '/.FocusService'
+GUEST_MEMORY_MB = 4096
+SHUTDOWN_TIMEOUT = 75
 
 def command(args, timeout=20, check=True):
     return subprocess.run([str(x) for x in args], capture_output=True, text=True,
@@ -61,15 +63,20 @@ class Runtime:
             log_dir = DATA / 'logs'
             log_dir.mkdir(exist_ok=True)
             env = dict(os.environ, QT_QPA_PLATFORM='xcb',
+                       ANDROID_EMULATOR_WAIT_TIME_BEFORE_KILL='60',
                        ANDROID_HOME=str(DATA / 'sdk'), ANDROID_SDK_ROOT=str(DATA / 'sdk'),
                        ANDROID_USER_HOME=str(DATA / 'state'), ANDROID_EMULATOR_HOME=str(DATA / 'state'),
                        ANDROID_AVD_HOME=str(DATA / 'devices'))
             env.pop('QT_PLUGIN_PATH', None)
+            persistent_cache = DATA / 'devices/Instagram.avd/cache-persistent.img'
+            snapshot_args = [] if persistent_cache.exists() else ['-no-snapshot-load']
             with (log_dir / 'focus-gram.log').open('a') as log:
                 self.process = subprocess.Popen([
                     str(DATA / 'sdk/emulator/emulator'), '-avd', 'Instagram', '-port', '5556',
-                    '-memory', '3072', '-cores', '4', '-gpu', 'host', '-feature', '-Vulkan', '-no-boot-anim',
+                    '-memory', str(GUEST_MEMORY_MB), '-cores', '4', '-gpu', 'host', '-feature', '-Vulkan', '-no-boot-anim',
+                    '-cache', str(persistent_cache),
                     '-skin', '1280x800', '-camera-front', 'webcam0',
+                    *snapshot_args,
                 ], env=env, stdout=log, stderr=log, stdin=subprocess.DEVNULL, start_new_session=True)
             self.owned = True
         for _ in range(180):
@@ -144,7 +151,7 @@ class Runtime:
 
     def focus(self, enabled):
         for _ in range(3):
-            result = shell('am', 'broadcast', '--include-stopped-packages', '-n', PACKAGE + '/.ControlReceiver',
+            result = shell('am', 'broadcast', '--receiver-foreground', '--include-stopped-packages', '-n', PACKAGE + '/.ControlReceiver',
                   '-a', PACKAGE + '.SET_FOCUS', '--ez', 'enabled', 'true' if enabled else 'false')
             if 'Permission Denial' in result:
                 break
@@ -168,9 +175,9 @@ class Runtime:
         # Keep the embedded Qt surface alive until snapshot writing finishes.
         # Destroying its parent immediately can invalidate the saved GL context.
         if self.process:
-            self.process.wait(timeout=45)
+            self.process.wait(timeout=SHUTDOWN_TIMEOUT)
         elif self.pid:
-            for _ in range(450):
+            for _ in range(SHUTDOWN_TIMEOUT * 10):
                 stat = Path(f'/proc/{self.pid}/stat')
                 if not stat.exists() or stat.read_text().split(') ', 1)[1].startswith('Z'):
                     break

@@ -74,7 +74,7 @@ class FocusGram(Gtk.Application):
         options_menu = Gtk.Menu()
         keep_ready = Gtk.CheckMenuItem(label='Fast reopen')
         keep_ready.set_active(bool(self.preferences.get('keep_ready', True)))
-        keep_ready.set_tooltip_text('Keep Android paused in memory after closing; uses about 4 GB RAM')
+        keep_ready.set_tooltip_text('Keep Android paused in memory after closing; uses about 5 GB RAM')
         keep_ready.connect('toggled', self.toggle_keep_ready)
         options_menu.append(keep_ready)
         quit_all = Gtk.MenuItem(label='Quit completely')

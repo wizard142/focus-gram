@@ -65,7 +65,7 @@ class RuntimeTests(unittest.TestCase):
         item.process = Mock()
         with patch.object(runtime, 'console'):
             item.close()
-        item.process.wait.assert_called_once_with(timeout=45)
+        item.process.wait.assert_called_once_with(timeout=runtime.SHUTDOWN_TIMEOUT)
 
     def test_failed_detach_stops_guest_instead_of_leaving_it_hidden(self):
         item = runtime.Runtime()

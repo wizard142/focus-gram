@@ -24,6 +24,7 @@ public final class FocusService extends AccessibilityService {
     private final ArrayList<Rect> shown = new ArrayList<>();
     private boolean enabled = true;
     private long lastBack;
+    private long lastInspection;
     private WindowManager manager;
     private String lastMode = "";
     private final Runnable inspect = () -> evaluate();
@@ -37,13 +38,23 @@ public final class FocusService extends AccessibilityService {
 
     void setEnabled(boolean value) {
         enabled = value;
-        evaluate();
+        handler.removeCallbacks(inspect);
+        if (!enabled) display(new ArrayList<>(), "off");
+        else handler.post(inspect);
     }
 
     @Override public void onAccessibilityEvent(AccessibilityEvent event) {
-        // Coalesce bursts rather than polling or traversing on every video frame.
-        if (event.getPackageName() != null && event.getPackageName().toString().equals(getPackageName())) return;
-        if (!handler.hasCallbacks(inspect)) handler.postDelayed(inspect, 70);
+        if (!enabled) return;
+        CharSequence source = event.getPackageName();
+        boolean instagram = "com.instagram.android".contentEquals(source == null ? "" : source);
+        // Overlay/keyboard events must not trigger a new scan of Instagram.
+        if (!instagram && event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return;
+        if (source != null && source.toString().equals(getPackageName())) return;
+        // At most three checks per second, including during continuous scrolling.
+        if (!handler.hasCallbacks(inspect)) {
+            long delay = Math.max(0, 350 - (SystemClock.uptimeMillis() - lastInspection));
+            handler.postDelayed(inspect, delay);
+        }
     }
 
     @Override public void onInterrupt() { clear(); }
@@ -79,32 +90,43 @@ public final class FocusService extends AccessibilityService {
         }
         return false;
     }
-    private static void walk(AccessibilityNodeInfo node, List<AccessibilityNodeInfo> nodes, int depth) {
-        if (node == null || depth > 45 || nodes.size() > 1600) return;
-        nodes.add(node);
-        for (int i = 0; i < node.getChildCount(); i++) walk(node.getChild(i), nodes, depth + 1);
+    // Query only structural markers. Walking every child performs hundreds of
+    // cross-process calls on Instagram's UI thread, including invisible feed items.
+    private static final String[] MARKERS = {
+        "main_feed_action_bar", "layout_container_main", "profile_action_bar", "profile_viewpager",
+        "feed_tab", "home_tab", "clips_tab", "reels_tab", "search_tab",
+        "reels_tray_container", "reels_tray", "reel_tray", "stories_tray",
+        "row_feed_profile_header", "row_feed_photo", "row_feed_video",
+        "clips_viewer_view_pager", "clips_viewer_root", "clips_viewer_container"
+    };
+    private static List<AccessibilityNodeInfo> markers(AccessibilityNodeInfo root) {
+        ArrayList<AccessibilityNodeInfo> nodes = new ArrayList<>();
+        for (String key : MARKERS)
+            nodes.addAll(root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/" + key));
+        return nodes;
     }
     private void evaluate() {
         if (!enabled) { display(new ArrayList<>(), "off"); return; }
+        lastInspection = SystemClock.uptimeMillis();
         AccessibilityNodeInfo root = getRootInActiveWindow();
         if (root == null) return;
         if (!"com.instagram.android".contentEquals(root.getPackageName() == null ? "" : root.getPackageName())) {
             display(new ArrayList<>(), "outside"); return;
         }
-        ArrayList<AccessibilityNodeInfo> nodes = new ArrayList<>();
-        walk(root, nodes, 0);
+        List<AccessibilityNodeInfo> nodes = markers(root);
         Rect screen = bounds(root);
         ArrayList<Rect> masks = new ArrayList<>();
         ArrayList<Rect> profileGrids = new ArrayList<>();
         boolean home = false, blockedScreen = false, navigation = false;
         boolean profileContext = false;
+        int headerBottom = screen.top;
         int trayBottom = -1, postTop = Integer.MAX_VALUE, sidebarRight = screen.left, bottomNav = screen.bottom;
         for (AccessibilityNodeInfo node : nodes) {
             if (!node.isVisibleToUser()) continue;
             String key = id(node);
             Rect r = bounds(node);
             if (r.isEmpty()) continue;
-            if (key.equals("main_feed_action_bar")) home = true;
+            if (key.equals("main_feed_action_bar")) { home = true; headerBottom = r.bottom; }
             if (key.equals("layout_container_main")) bottomNav = Math.min(bottomNav, r.bottom);
             if (key.equals("profile_action_bar")) profileContext = true;
             if (key.equals("profile_viewpager")) profileGrids.add(r);
@@ -136,7 +158,7 @@ public final class FocusService extends AccessibilityService {
             }
             display(masks, "blocked");
         } else if (home || (navigation && trayBottom > 0)) {
-            int top = trayBottom > 0 ? trayBottom : postTop;
+            int top = trayBottom > 0 ? trayBottom : headerBottom;
             // Keep the Stories tray usable. A changed/unknown home layout is covered conservatively.
             if (top == Integer.MAX_VALUE || top < 0) top = screen.top;
             if (top < bottomNav) masks.add(new Rect(sidebarRight, top, screen.right, bottomNav));

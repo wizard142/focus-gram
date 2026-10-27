@@ -37,7 +37,7 @@ Accept the SDK licenses yourself. Before first use, start this AVD with the offi
 
 The tested AVD uses `hw.lcd.width=1280`, `hw.lcd.height=800`, `hw.lcd.density=180`, `hw.initialOrientation=landscape`, `hw.gpu.mode=host`, `hw.gpu.enabled=yes`, and `showDeviceFrame=no` in its `config.ini`. Apply these while the emulator is stopped. The native launcher supplies the memory/CPU/rendering flags.
 
-Focus mode uses a local accessibility service to cover feed content and block navigation to Reels/Explore. Stories, DMs and creation editors remain available. It examines Instagram’s view structure only, stores no screen contents, and requests no internet permission. The local desktop controller enables the helper through the emulator’s ADB connection; existing accessibility services are preserved. This is a screen filter, not an account security feature or an Instagram server filter. Instagram layout updates may require selector changes.
+Focus mode uses a local accessibility service to cover feed content and block navigation to Reels/Explore. Stories, DMs and creation editors remain available. It queries a fixed set of Instagram layout IDs at most once every 350 ms, skips unrelated app events, and does no scanning while Focus is off. It examines Instagram’s view structure only, stores no screen contents, and requests no internet permission. The local desktop controller enables the helper through the emulator’s ADB connection; existing accessibility services are preserved. This is a screen filter, not an account security feature or an Instagram server filter. Instagram layout updates may require selector changes.
 
 [Local performance checks](PERFORMANCE.md) record the measured startup, CPU and memory tradeoffs.
 
@@ -46,10 +46,11 @@ The controller’s broadcast receiver requires Android’s `DUMP` permission, pr
 ## Resources and lifecycle
 
 - Uses KVM and host OpenGL with Vulkan disabled to avoid waking the discrete NVIDIA GPU alongside the Intel GPU on the tested laptop.
+- Allocates 4 GiB of guest memory to reduce Android swap/reclaim stalls.
 - Renders 1280 × 800 into a freely resizable desktop window.
-- Uses Quick Boot snapshots after the first cold boot. Changing the emulator configuration invalidates its previous snapshot.
+- Uses Quick Boot snapshots with a persistent Android cache disk after the first cold boot. Changing the emulator configuration invalidates its previous snapshot. Shutdown allows the snapshot writer up to 60 seconds before the emulator watchdog intervenes.
 - Pauses the virtual machine while minimized and resumes it when restored. Android notifications and background uploads also pause, so keep the window open during publishing.
-- **Fast reopen** is on by default: closing detaches/hides the Android display and keeps the VM paused in memory (about 4 GB RAM including emulator overhead). Reopening resumes it without restoring a snapshot.
+- **Fast reopen** is on by default: closing detaches/hides the Android display and keeps the VM paused in memory (about 5 GB RAM including emulator overhead). Reopening resumes it without restoring a snapshot.
 - Use **⋯ → Quit completely**, or turn off **Fast reopen**, to save/exit Android and release its VM, camera and GPU resources. The following launch then needs snapshot restoration.
 - No whole-library syncing, screenshot polling, telemetry or unofficial publishing API in this shell.
 
